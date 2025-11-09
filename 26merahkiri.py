@@ -1,6 +1,4 @@
-# =================================================================
-# Garuda Layang — v3.0 Final (Fixed Orientation + Adaptive Lighting)
-# =================================================================
+
 import os
 import time
 import cv2
@@ -10,14 +8,14 @@ from flask import Flask, render_template, Response, jsonify
 from waitress import serve
 from collections import deque
 
-# ===================== KONFIGURASI UTAMA =====================
-MODEL_PATH = "/home/pi/kapalASVtoRaspberry/best.pt"
+
+MODEL_PATH = "/home/pi/kapalASVtoRaspberry/model/best.pt"
 CONF = 0.18
 CAM_W, CAM_H = 640, 480
-IMG_SZ = 192
+IMG_SZ = 256
 PROCESS_EVERY_N_FRAMES = 1
 
-# --- Navigasi ---
+
 TRACKING_TTL = 12
 CENTER_MARGIN = 42
 GATE_WIDTH_PASS_THRESHOLD = CAM_W * 0.75
@@ -28,25 +26,25 @@ PERSISTENCE_REQUIRE = 3
 RECOVERY_GRACE_S = 1.0
 FAILSAFE_TIMEOUT = 15.0
 
-# --- Steering mapping ---
+
 STEER_SMALL = "belok_kecil"
 STEER_MED = "belok_sedang"
 STEER_LARGE = "belok_besar"
 
-# --- Serial ---
+
 COMMAND_COOLDOWN = 0.2
 SERIAL_PORT, SERIAL_BAUD, SERIAL_ENABLED = "/dev/ttyUSB0", 9600, True
 
-# --- Web ---
+
 HOST = "0.0.0.0"
 PORT = 2045
 TEAM_NAME = "Garuda Layang"
-TRACK_INFO = "Lintasan Tetap (Merah Kiri - Hijau Kanan)"
+TRACK_INFO = "Merah Kiri - Hijau Kanan"
 SHOW_OVERLAY = False
 
-# --- Logging ---
+
 LOG_PATH = "/tmp/garudalayang_v3.0.log"
-# =============================================================
+
 
 output_frame_lock = Lock()
 telemetry_lock = Lock()
@@ -54,9 +52,9 @@ output_frame = None
 telemetry = {"lat": "-", "lon": "-", "dir": "0", "cmd": "stop", "state": "INIT"}
 ser = None
 
-# FSM state
+
 state = "SEARCHING"
-lane_orientation = "RED_LEFT"  # ⚓ Tetap: merah di kiri, hijau di kanan
+lane_orientation = "RED_LEFT"  
 last_turn_direction = "kiri"
 state_transition_time = 0
 next_turn_hint = "kanan"
@@ -67,7 +65,7 @@ det = {
 }
 gate_history = deque(maxlen=SMOOTH_HISTORY)
 
-# ===================== Helper =====================
+
 def log(msg):
     ts = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
     s = f"[{ts}] {msg}"
@@ -87,7 +85,6 @@ def safe_ser_write(cmd_str):
     except Exception as e:
         log(f"[SERIAL ERROR] {e}")
 
-# ===================== Camera Stream =====================
 class CameraStream:
     def __init__(self, src=0, width=CAM_W, height=CAM_H):
         self.stream = cv2.VideoCapture(src, cv2.CAP_V4L2)
@@ -97,13 +94,12 @@ class CameraStream:
         self.stream.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
         self.stream.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
 
-        # ==== Auto exposure & WB ====
         self.stream.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.75)
         self.stream.set(cv2.CAP_PROP_AUTO_WB, 1)
         self.stream.set(cv2.CAP_PROP_BRIGHTNESS, 0.5)
         self.stream.set(cv2.CAP_PROP_CONTRAST, 0.5)
         self.stream.set(cv2.CAP_PROP_SATURATION, 0.5)
-        # ============================
+       
 
         self.stopped = False
         _, self.frame = self.stream.read()
@@ -130,7 +126,7 @@ class CameraStream:
         except:
             pass
 
-# ===================== Adaptive Lighting =====================
+
 def adjust_lighting(frame):
     lab = cv2.cvtColor(frame, cv2.COLOR_BGR2LAB)
     l, a, b = cv2.split(lab)
@@ -145,7 +141,6 @@ def adjust_lighting(frame):
     frame_adj = cv2.convertScaleAbs(frame_eq, alpha=gain, beta=0)
     return frame_adj
 
-# ===================== Serial Reader =====================
 def serial_reader():
     global ser, telemetry
     if not SERIAL_ENABLED:
@@ -174,7 +169,7 @@ def serial_reader():
         except Exception:
             time.sleep(0.05)
 
-# ===================== Utilities =====================
+
 def mark_seen(name, box, cx):
     det[name]["seen"] += 1
     det[name]["last_seen"] = time.time()
@@ -207,14 +202,14 @@ def steering_from_norm_error(norm_error):
     if ae < 0.55: return STEER_MED
     return STEER_LARGE
 
-# ===================== Detection & FSM =====================
+
 def run_detection():
     global output_frame, telemetry, ser, state, lane_orientation, last_turn_direction, state_transition_time, next_turn_hint
 
     model = YOLO(MODEL_PATH)
     vs = CameraStream(src=0, width=CAM_W, height=CAM_H).start()
     time.sleep(1.2)
-    log("[INFO] YOLO & Kamera aktif (v3.0).")
+    log("[INFO] YOLO & Kamera aktif")
 
     tracked = {}
     frame_count = 0
@@ -355,7 +350,7 @@ def run_detection():
 
         frame_count += 1
 
-# ===================== Web Server =====================
+
 app = Flask(__name__)
 
 @app.route("/")
@@ -383,11 +378,10 @@ def get_telemetry():
     with telemetry_lock:
         return jsonify(telemetry)
 
-# ===================== Main =====================
 if __name__ == '__main__':
     try:
         open(LOG_PATH, "a").close()
-        log("=== START Garuda Layang v3.0 ===")
+        log("=== START Garuda Layang ===")
 
         Thread(target=serial_reader, daemon=True).start()
         Thread(target=run_detection, daemon=True).start()
@@ -406,4 +400,5 @@ if __name__ == '__main__':
                 ser.close()
             except:
                 pass
-        log("=== STOP Garuda Layang v3.0 ===")
+        log("=== STOP Garuda Layang ===")
+
